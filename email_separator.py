@@ -3,10 +3,11 @@ import sys
 import time
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel, 
-    QFileDialog, QMessageBox, QProgressBar, QGroupBox, QGridLayout, QFrame
+    QFileDialog, QMessageBox, QProgressBar, QGroupBox, QGridLayout, QFrame,
+    QMenuBar, QAction, QMainWindow, QShortcut, QDialog, QTextBrowser
 )
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
-from PyQt5.QtGui import QFont, QPalette, QColor, QDragEnterEvent, QDropEvent
+from PyQt5.QtGui import QFont, QPalette, QColor, QDragEnterEvent, QDropEvent, QKeySequence, QIcon
 import os
 
 class FileProcessor(QThread):
@@ -102,11 +103,240 @@ class ExportProcessor(QThread):
         except Exception as e:
             self.finished.emit(f"❌ Export Failed: {str(e)}")
 
-class EmailSeparatorApp(QWidget):
+class AboutDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("📧 About LeadSieveX")
+        self.setFixedSize(400, 300)
+        self.setModal(True)
+        
+        layout = QVBoxLayout()
+        
+        # Title
+        title = QLabel("📧 LeadSieveX Email Separator")
+        title.setStyleSheet("font-size: 18px; font-weight: bold; color: #2196F3; margin: 10px;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+        
+        # Version info
+        version_info = QTextBrowser()
+        version_info.setMaximumHeight(200)
+        version_info.setHtml("""
+        <div style="font-family: Arial; font-size: 12px; line-height: 1.5;">
+            <p><b>Version:</b> 2.0.0</p>
+            <p><b>Release Date:</b> September 2025</p>
+            <p><b>Developer:</b> Star Signs</p>
+            
+            <h3 style="color: #4CAF50;">Features:</h3>
+            <ul>
+                <li>📂 Load and process large email lists (millions of emails)</li>
+                <li>🗑️ Remove unwanted emails by file or manual input</li>
+                <li>✂️ High-performance email separation using Python sets</li>
+                <li>📊 Real-time statistics and performance monitoring</li>
+                <li>🎯 Drag & drop file support</li>
+                <li>💾 Export results with detailed success confirmation</li>
+                <li>🎨 Modern, professional user interface</li>
+            </ul>
+            
+            <h3 style="color: #FF5722;">Technology Stack:</h3>
+            <ul>
+                <li>Python 3.6+</li>
+                <li>PyQt5 for GUI</li>
+                <li>Multi-threading for responsive UI</li>
+                <li>Git version control</li>
+            </ul>
+            
+            <p style="margin-top: 15px; color: #666;">
+                <b>GitHub:</b> 
+                <a href="https://github.com/starsigns/leadsievex_emailseperator">
+                    github.com/starsigns/leadsievex_emailseperator
+                </a>
+            </p>
+        </div>
+        """)
+        layout.addWidget(version_info)
+        
+        # Close button
+        close_btn = QPushButton("✅ Close")
+        close_btn.clicked.connect(self.accept)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                font-size: 12px;
+                font-weight: bold;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        layout.addWidget(close_btn)
+        
+        self.setLayout(layout)
+
+class EmailSeparatorMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle('📧 LeadSieveX - Email Separator')
         self.setGeometry(100, 100, 1000, 700)
+        
+        # Create central widget
+        self.central_widget = EmailSeparatorWidget()
+        self.setCentralWidget(self.central_widget)
+        
+        self.setAcceptDrops(True)  # Enable drag and drop
+        self.setup_menu_bar()
+        self.setup_shortcuts()
+        
+    def setup_menu_bar(self):
+        """Create the menu bar with File, Edit, View, and Help menus"""
+        menubar = self.menuBar()
+        
+        # File Menu
+        file_menu = menubar.addMenu('📁 &File')
+        
+        # Load Main List
+        load_main_action = QAction('📂 &Load Main List...', self)
+        load_main_action.setShortcut(QKeySequence.Open)
+        load_main_action.setStatusTip('Load main email list from file (Ctrl+O)')
+        load_main_action.triggered.connect(self.central_widget.load_main_list)
+        file_menu.addAction(load_main_action)
+        
+        # Load Unwanted List
+        load_unwanted_action = QAction('🗑️ Load &Unwanted List...', self)
+        load_unwanted_action.setShortcut('Ctrl+U')
+        load_unwanted_action.setStatusTip('Load unwanted email list from file (Ctrl+U)')
+        load_unwanted_action.triggered.connect(self.central_widget.load_unwanted_list)
+        file_menu.addAction(load_unwanted_action)
+        
+        file_menu.addSeparator()
+        
+        # Export Results
+        export_action = QAction('💾 &Export Results...', self)
+        export_action.setShortcut(QKeySequence.Save)
+        export_action.setStatusTip('Export filtered email list (Ctrl+S)')
+        export_action.triggered.connect(self.central_widget.export_result)
+        file_menu.addAction(export_action)
+        
+        file_menu.addSeparator()
+        
+        # Exit
+        exit_action = QAction('🚪 E&xit', self)
+        exit_action.setShortcut(QKeySequence.Quit)
+        exit_action.setStatusTip('Exit application (Ctrl+Q)')
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+        
+        # Edit Menu
+        edit_menu = menubar.addMenu('✏️ &Edit')
+        
+        # Clear Text Area
+        clear_action = QAction('🧹 &Clear Text Area', self)
+        clear_action.setShortcut('Ctrl+L')
+        clear_action.setStatusTip('Clear the manual input text area (Ctrl+L)')
+        clear_action.triggered.connect(self.central_widget.clear_text_area)
+        edit_menu.addAction(clear_action)
+        
+        # Process Menu
+        process_menu = menubar.addMenu('⚡ &Process')
+        
+        # Separate Emails
+        separate_action = QAction('✂️ &Separate Emails', self)
+        separate_action.setShortcut('Ctrl+R')
+        separate_action.setStatusTip('Process email separation (Ctrl+R)')
+        separate_action.triggered.connect(self.central_widget.separate_emails)
+        process_menu.addAction(separate_action)
+        
+        # View Menu
+        view_menu = menubar.addMenu('👁️ &View')
+        
+        # Refresh Statistics
+        refresh_stats_action = QAction('🔄 &Refresh Statistics', self)
+        refresh_stats_action.setShortcut('F5')
+        refresh_stats_action.setStatusTip('Refresh statistics panel (F5)')
+        refresh_stats_action.triggered.connect(self.central_widget.update_statistics)
+        view_menu.addAction(refresh_stats_action)
+        
+        # Help Menu
+        help_menu = menubar.addMenu('❓ &Help')
+        
+        # Keyboard Shortcuts
+        shortcuts_action = QAction('⌨️ &Keyboard Shortcuts', self)
+        shortcuts_action.setShortcut('F1')
+        shortcuts_action.setStatusTip('Show keyboard shortcuts (F1)')
+        shortcuts_action.triggered.connect(self.show_shortcuts)
+        help_menu.addAction(shortcuts_action)
+        
+        help_menu.addSeparator()
+        
+        # About
+        about_action = QAction('📧 &About LeadSieveX', self)
+        about_action.setStatusTip('About this application')
+        about_action.triggered.connect(self.show_about)
+        help_menu.addAction(about_action)
+        
+        # Status bar
+        self.statusBar().showMessage('🟢 Ready - Use File menu or drag & drop to get started')
+    
+    def setup_shortcuts(self):
+        """Setup additional keyboard shortcuts"""
+        # Focus shortcuts
+        focus_text_shortcut = QShortcut(QKeySequence('Ctrl+T'), self)
+        focus_text_shortcut.activated.connect(lambda: self.central_widget.text_area.setFocus())
+        
+    def show_shortcuts(self):
+        """Show keyboard shortcuts dialog"""
+        msg = QMessageBox()
+        msg.setWindowTitle('⌨️ Keyboard Shortcuts')
+        msg.setText("""
+<h3>📁 File Operations:</h3>
+<b>Ctrl+O</b> - Load Main List<br>
+<b>Ctrl+U</b> - Load Unwanted List<br>
+<b>Ctrl+S</b> - Export Results<br>
+<b>Ctrl+Q</b> - Exit Application<br>
+
+<h3>✏️ Editing:</h3>
+<b>Ctrl+L</b> - Clear Text Area<br>
+<b>Ctrl+T</b> - Focus Text Area<br>
+
+<h3>⚡ Processing:</h3>
+<b>Ctrl+R</b> - Separate Emails<br>
+
+<h3>👁️ View:</h3>
+<b>F5</b> - Refresh Statistics<br>
+<b>F1</b> - Show This Help<br>
+
+<h3>🎯 Tips:</h3>
+• Drag & drop .txt files onto the window<br>
+• All buttons have tooltips for guidance<br>
+• Statistics update in real-time<br>
+        """)
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.exec_()
+    
+    def show_about(self):
+        """Show about dialog"""
+        about_dialog = AboutDialog(self)
+        about_dialog.exec_()
+    
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        """Handle drag enter events"""
+        self.central_widget.dragEnterEvent(event)
+        
+    def dragLeaveEvent(self, event):
+        """Handle drag leave events"""
+        self.central_widget.dragLeaveEvent(event)
+        
+    def dropEvent(self, event: QDropEvent):
+        """Handle file drop events"""
+        self.central_widget.dropEvent(event)
+
+class EmailSeparatorWidget(QWidget):
+    def __init__(self):
+        super().__init__()
         self.main_emails = set()
         self.result_emails = set()
         self.main_file = None
@@ -114,6 +344,11 @@ class EmailSeparatorApp(QWidget):
         self.setAcceptDrops(True)  # Enable drag and drop
         self.setup_styles()
         self.init_ui()
+
+    def clear_text_area(self):
+        """Clear the text area and update statistics"""
+        self.text_area.clear()
+        self.update_statistics()
 
     def setup_styles(self):
         """Apply modern styling to the application"""
@@ -216,12 +451,12 @@ class EmailSeparatorApp(QWidget):
         file_ops_layout = QVBoxLayout()
         
         self.load_btn = QPushButton('📂 Load Main Email List')
-        self.load_btn.setToolTip('Load your main email list (supports drag & drop)')
+        self.load_btn.setToolTip('📂 Load your main email list from a .txt file\n• Supports files with millions of emails\n• One email per line format\n• Keyboard shortcut: Ctrl+O\n• Drag & drop supported')
         self.load_btn.clicked.connect(self.load_main_list)
         file_ops_layout.addWidget(self.load_btn)
 
         self.load_unwanted_btn = QPushButton('🗑️ Load Unwanted List from File')
-        self.load_unwanted_btn.setToolTip('Load emails to remove from file (supports drag & drop)')
+        self.load_unwanted_btn.setToolTip('🗑️ Load emails to remove from a .txt file\n• These emails will be excluded from the main list\n• One email per line format\n• Keyboard shortcut: Ctrl+U\n• Drag & drop supported')
         self.load_unwanted_btn.clicked.connect(self.load_unwanted_list)
         file_ops_layout.addWidget(self.load_unwanted_btn)
         
@@ -236,9 +471,10 @@ class EmailSeparatorApp(QWidget):
         text_input_layout.addWidget(self.text_label)
 
         self.text_area = QTextEdit()
-        self.text_area.setPlaceholderText("email1@example.com\nemail2@example.com\n...")
+        self.text_area.setPlaceholderText("📝 Paste emails here...\n\nExample:\nemail1@example.com\nemail2@example.com\nemail3@example.com\n\n💡 Tip: Use Ctrl+L to clear this area")
         self.text_area.setMaximumHeight(150)
         self.text_area.textChanged.connect(self.update_statistics)  # Update stats when text changes
+        self.text_area.setToolTip('✏️ Manual email input area\n• Paste emails to remove (one per line)\n• Combines with file-loaded emails\n• Real-time statistics update\n• Keyboard shortcut: Ctrl+T to focus\n• Ctrl+L to clear')
         text_input_layout.addWidget(self.text_area)
         
         text_input_group.setLayout(text_input_layout)
@@ -535,7 +771,7 @@ class EmailSeparatorApp(QWidget):
 
 def main():
     app = QApplication(sys.argv)
-    window = EmailSeparatorApp()
+    window = EmailSeparatorMainWindow()
     window.show()
     sys.exit(app.exec_())
 
