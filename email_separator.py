@@ -4,7 +4,7 @@ import time
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel, 
     QFileDialog, QMessageBox, QProgressBar, QGroupBox, QGridLayout, QFrame,
-    QMenuBar, QAction, QMainWindow, QShortcut, QDialog, QTextBrowser
+    QMenuBar, QAction, QMainWindow, QShortcut, QDialog, QTextBrowser, QTabWidget
 )
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QFont, QPalette, QColor, QDragEnterEvent, QDropEvent, QKeySequence, QIcon
@@ -243,6 +243,15 @@ class EmailSeparatorMainWindow(QMainWindow):
         # Process Menu
         process_menu = menubar.addMenu('⚡ &Process')
         
+        # Preview Emails
+        preview_action = QAction('👁️ &Preview Emails to Remove', self)
+        preview_action.setShortcut('Ctrl+P')
+        preview_action.setStatusTip('Preview emails that will be removed (Ctrl+P)')
+        preview_action.triggered.connect(self.central_widget.preview_emails)
+        process_menu.addAction(preview_action)
+        
+        process_menu.addSeparator()
+        
         # Separate Emails
         separate_action = QAction('✂️ &Separate Emails', self)
         separate_action.setShortcut('Ctrl+R')
@@ -303,6 +312,7 @@ class EmailSeparatorMainWindow(QMainWindow):
 <b>Ctrl+T</b> - Focus Text Area<br>
 
 <h3>⚡ Processing:</h3>
+<b>Ctrl+P</b> - Preview Emails to Remove<br>
 <b>Ctrl+R</b> - Separate Emails<br>
 
 <h3>👁️ View:</h3>
@@ -484,13 +494,19 @@ class EmailSeparatorWidget(QWidget):
         actions_group = QGroupBox("⚡ Actions")
         actions_layout = QVBoxLayout()
         
+        # Preview button
+        self.preview_btn = QPushButton('👁️ Preview Emails to Remove')
+        self.preview_btn.setToolTip('👁️ Preview emails that will be removed\n• Shows up to 100 sample emails\n• No changes are made to your data\n• Keyboard shortcut: Ctrl+P')
+        self.preview_btn.clicked.connect(self.preview_emails)
+        actions_layout.addWidget(self.preview_btn)
+        
         self.separate_btn = QPushButton('✂️ Separate Emails')
-        self.separate_btn.setToolTip('Remove unwanted emails from main list')
+        self.separate_btn.setToolTip('✂️ Remove unwanted emails from main list\n• Process and filter the email list\n• Creates a new clean list\n• Keyboard shortcut: Ctrl+R')
         self.separate_btn.clicked.connect(self.separate_emails)
         actions_layout.addWidget(self.separate_btn)
 
         self.export_btn = QPushButton('💾 Export Result')
-        self.export_btn.setToolTip('Save the filtered email list')
+        self.export_btn.setToolTip('💾 Save the filtered email list to a file\n• Export the processed results\n• Choose your save location\n• Keyboard shortcut: Ctrl+S')
         self.export_btn.clicked.connect(self.export_result)
         actions_layout.addWidget(self.export_btn)
         
@@ -768,6 +784,193 @@ class EmailSeparatorWidget(QWidget):
             self.status_label.setText('Export failed.')
         
         self.update_statistics()
+
+    def preview_emails(self):
+        """Preview emails that will be removed before separation"""
+        # Get emails from text area
+        pasted_emails = set(email.strip() for email in self.text_area.toPlainText().splitlines() if email.strip())
+        
+        # Combine with file-loaded unwanted emails
+        total_unwanted = pasted_emails | self.unwanted_emails
+        
+        if not total_unwanted:
+            QMessageBox.information(self, 'Preview', 
+                '📭 No emails to remove found.\n\n'
+                'Please either:\n'
+                '• Load an unwanted list file, or\n'
+                '• Paste emails in the text area')
+            return
+        
+        # Check which emails actually exist in main list (if loaded)
+        if self.main_emails:
+            emails_to_remove = total_unwanted & self.main_emails
+            emails_not_found = total_unwanted - self.main_emails
+        else:
+            emails_to_remove = total_unwanted
+            emails_not_found = set()
+        
+        # Show preview dialog
+        preview_dialog = EmailPreviewDialog(
+            emails_to_remove, 
+            emails_not_found, 
+            len(self.main_emails) if self.main_emails else 0,
+            self
+        )
+        preview_dialog.exec_()
+
+class EmailPreviewDialog(QDialog):
+    """Dialog to preview emails that will be removed"""
+    
+    def __init__(self, emails_to_remove, emails_not_found, main_list_size, parent=None):
+        super().__init__(parent)
+        self.emails_to_remove = emails_to_remove
+        self.emails_not_found = emails_not_found
+        self.main_list_size = main_list_size
+        self.setWindowTitle('👁️ Email Preview')
+        self.setWindowIcon(self.parent().windowIcon() if parent else None)
+        self.resize(700, 500)
+        self.setup_ui()
+    
+    def setup_ui(self):
+        """Setup the preview dialog UI"""
+        layout = QVBoxLayout()
+        
+        # Header with statistics
+        header = QLabel()
+        header.setWordWrap(True)
+        header.setAlignment(Qt.AlignCenter)
+        
+        if self.main_list_size > 0:
+            removal_percentage = (len(self.emails_to_remove) / self.main_list_size) * 100 if self.main_list_size > 0 else 0
+            remaining_count = self.main_list_size - len(self.emails_to_remove)
+            remaining_percentage = (remaining_count / self.main_list_size) * 100 if self.main_list_size > 0 else 0
+            
+            header.setText(f"""
+            <div style="font-size: 14px; margin: 10px;">
+                <h3 style="color: #4CAF50;">📊 Preview Summary</h3>
+                <p><b>📧 Main List Size:</b> {self.main_list_size:,} emails</p>
+                <p><b>🗑️ Emails to Remove:</b> {len(self.emails_to_remove):,} emails ({removal_percentage:.1f}%)</p>
+                <p><b>✅ Emails Remaining:</b> {remaining_count:,} emails ({remaining_percentage:.1f}%)</p>
+                {f'<p><b>❌ Not Found in Main List:</b> {len(self.emails_not_found):,} emails</p>' if self.emails_not_found else ''}
+            </div>
+            """)
+        else:
+            header.setText(f"""
+            <div style="font-size: 14px; margin: 10px;">
+                <h3 style="color: #FF9800;">⚠️ No Main List Loaded</h3>
+                <p><b>🗑️ Emails to Remove:</b> {len(self.emails_to_remove):,} emails</p>
+                <p><i>Load a main list to see detailed removal statistics</i></p>
+            </div>
+            """)
+        
+        layout.addWidget(header)
+        
+        # Tabs for different email lists
+        tab_widget = QTabWidget()
+        
+        # Tab 1: Emails to remove (found in main list)
+        if self.emails_to_remove:
+            remove_tab = QWidget()
+            remove_layout = QVBoxLayout()
+            
+            remove_info = QLabel(f'📧 These {len(self.emails_to_remove):,} emails will be removed from your main list:')
+            remove_info.setStyleSheet("font-weight: bold; color: #d32f2f; margin: 5px;")
+            remove_layout.addWidget(remove_info)
+            
+            remove_text = QTextEdit()
+            remove_text.setReadOnly(True)
+            remove_text.setFont(QFont("Consolas", 10))
+            
+            # Show sample of emails (limit to 100 for performance)
+            sample_emails = list(self.emails_to_remove)[:100]
+            email_text = '\n'.join(sample_emails)
+            
+            if len(self.emails_to_remove) > 100:
+                email_text += f'\n\n... and {len(self.emails_to_remove) - 100:,} more emails'
+            
+            remove_text.setText(email_text)
+            remove_layout.addWidget(remove_text)
+            
+            remove_tab.setLayout(remove_layout)
+            tab_widget.addTab(remove_tab, f'🗑️ To Remove ({len(self.emails_to_remove):,})')
+        
+        # Tab 2: Emails not found in main list
+        if self.emails_not_found:
+            not_found_tab = QWidget()
+            not_found_layout = QVBoxLayout()
+            
+            not_found_info = QLabel(f'⚠️ These {len(self.emails_not_found):,} emails are not in your main list:')
+            not_found_info.setStyleSheet("font-weight: bold; color: #ff9800; margin: 5px;")
+            not_found_layout.addWidget(not_found_info)
+            
+            not_found_text = QTextEdit()
+            not_found_text.setReadOnly(True)
+            not_found_text.setFont(QFont("Consolas", 10))
+            
+            # Show sample of emails (limit to 100 for performance)
+            sample_not_found = list(self.emails_not_found)[:100]
+            not_found_email_text = '\n'.join(sample_not_found)
+            
+            if len(self.emails_not_found) > 100:
+                not_found_email_text += f'\n\n... and {len(self.emails_not_found) - 100:,} more emails'
+            
+            not_found_text.setText(not_found_email_text)
+            not_found_layout.addWidget(not_found_text)
+            
+            not_found_tab.setLayout(not_found_layout)
+            tab_widget.addTab(not_found_tab, f'❌ Not Found ({len(self.emails_not_found):,})')
+        
+        layout.addWidget(tab_widget)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        
+        close_btn = QPushButton('📋 Close Preview')
+        close_btn.clicked.connect(self.accept)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #6c757d;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                font-size: 12px;
+                font-weight: bold;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #5a6268;
+            }
+        """)
+        
+        if self.emails_to_remove and self.main_list_size > 0:
+            proceed_btn = QPushButton('✂️ Proceed with Separation')
+            proceed_btn.clicked.connect(self.proceed_separation)
+            proceed_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #28a745;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    font-size: 12px;
+                    font-weight: bold;
+                    border-radius: 5px;
+                }
+                QPushButton:hover {
+                    background-color: #218838;
+                }
+            """)
+            button_layout.addWidget(proceed_btn)
+        
+        button_layout.addWidget(close_btn)
+        layout.addLayout(button_layout)
+        
+        self.setLayout(layout)
+    
+    def proceed_separation(self):
+        """Close preview and trigger separation"""
+        self.accept()
+        if self.parent():
+            self.parent().separate_emails()
 
 def main():
     app = QApplication(sys.argv)
