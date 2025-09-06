@@ -134,7 +134,6 @@ class EmailSeparatorApp(QWidget):
             }
             QPushButton:hover {
                 background-color: #45a049;
-                transform: translateY(-1px);
             }
             QPushButton:pressed {
                 background-color: #3d8b40;
