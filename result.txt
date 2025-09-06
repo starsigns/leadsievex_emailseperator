@@ -1,0 +1,15 @@
+amanda.clark@consulting.biz
+andrew.hall@growth.io
+ashley.lee@design.co
+brittany.young@product.net
+christopher.harris@legal.org
+jennifer.martinez@hr.org
+jessica.thomas@support.io
+john.doe@example.com
+lisa.taylor@marketing.co
+michael.garcia@finance.com
+mike.wilson@business.org
+robert.davis@sales.biz
+sarah.johnson@startup.io
+stephanie.walker@strategy.com
+william.anderson@operations.net
