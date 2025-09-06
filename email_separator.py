@@ -506,7 +506,7 @@ class EmailSeparatorWidget(QWidget):
         actions_layout.addWidget(self.separate_btn)
 
         self.export_btn = QPushButton('💾 Export Result')
-        self.export_btn.setToolTip('💾 Save the filtered email list to a file\n• Export the processed results\n• Choose your save location\n• Keyboard shortcut: Ctrl+S')
+        self.export_btn.setToolTip('💾 Save the filtered email list to a file\n• Predefined filename: "separated_YYYYMMDD_HHMMSS.txt"\n• Customize filename as needed\n• Export the processed results\n• Keyboard shortcut: Ctrl+S')
         self.export_btn.clicked.connect(self.export_result)
         actions_layout.addWidget(self.export_btn)
         
@@ -752,7 +752,20 @@ class EmailSeparatorWidget(QWidget):
         if not self.result_emails:
             QMessageBox.critical(self, 'Error', 'No result to export. Run separation first.')
             return
-        file_path, _ = QFileDialog.getSaveFileName(self, 'Save Result', '', 'Text Files (*.txt)')
+        
+        # Get current timestamp for unique filename
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Set predefined filename with timestamp
+        default_filename = f"separated_{timestamp}.txt"
+        
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, 
+            'Save Separated Email List', 
+            default_filename,  # Predefined filename
+            'Text Files (*.txt);;All Files (*)'
+        )
         if file_path:
             self.export_btn.setEnabled(False)
             self.progress_bar.setVisible(True)
